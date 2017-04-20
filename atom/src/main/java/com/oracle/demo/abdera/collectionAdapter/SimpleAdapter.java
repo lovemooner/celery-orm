@@ -4,6 +4,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 
+import com.oracle.demo.model.Employee;
 import org.apache.abdera.i18n.iri.IRI;
 import org.apache.abdera.i18n.text.Sanitizer;
 import org.apache.abdera.model.Content;

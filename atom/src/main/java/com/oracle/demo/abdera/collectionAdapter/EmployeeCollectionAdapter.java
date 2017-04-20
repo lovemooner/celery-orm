@@ -1,38 +1,38 @@
 package com.oracle.demo.abdera.collectionAdapter;
 
-import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.oracle.demo.dao.EmployeesDao;
+import com.oracle.demo.model.Employee;
 import org.apache.abdera.Abdera;
 import org.apache.abdera.factory.Factory;
 import org.apache.abdera.i18n.iri.IRI;
 import org.apache.abdera.model.Content;
 import org.apache.abdera.model.Person;
 import org.apache.abdera.model.Text;
-import org.apache.abdera.model.Workspace;
 import org.apache.abdera.protocol.server.RequestContext;
 import org.apache.abdera.protocol.server.context.ResponseContextException;
 import org.apache.abdera.protocol.server.impl.AbstractEntityCollectionAdapter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.tools.JavaCompiler;
 
 public final class EmployeeCollectionAdapter extends AbstractEntityCollectionAdapter<Employee> {
 
-    public static final String ID_PREFIX = "id:";
-    private AtomicInteger nextId = new AtomicInteger(1000);
+    private static final Logger LOG = LoggerFactory.getLogger(EmployeeCollectionAdapter.class);
+
+    public static final String ID_PREFIX = "IRI:";
     private Factory factory = new Abdera().getFactory();
 
-    private HashMap<Integer, Employee> employees = new HashMap<Integer, Employee>();
+    private EmployeesDao dao = new EmployeesDao();
 
-    {
-        Employee employee = new Employee();
-//        employee.setId(nextId.getAndIncrement());
-//        employee.setName("init_name");
-//        employees.put(employee.getId(), employee);
-    }
 
     @Override
     public String getId(RequestContext request) {
@@ -82,20 +82,30 @@ public final class EmployeeCollectionAdapter extends AbstractEntityCollectionAda
     @Override
     public Object getContent(Employee employee, RequestContext request) throws ResponseContextException {
         Content content = factory.newContent(Content.Type.TEXT);
-        Gson gson =  new GsonBuilder().setPrettyPrinting().create();
-        content.setText("\n "+gson.toJson(employee).replace("}"," }\n"));
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        content.setText("\n " + gson.toJson(employee).replace("}", " }\n"));
         return content;
     }
 
     @Override
     public Iterable<Employee> getEntries(RequestContext request) throws ResponseContextException {
-        return employees.values();
+        try {
+            return dao.findAll();
+        } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+        }
+        return null;
     }
 
     @Override
     public Employee getEntry(String resourceName, RequestContext request) throws ResponseContextException {
         Integer id = getIdFromResourceName(resourceName);
-        return employees.get(id);
+        try {
+            return dao.findById(id);
+        } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+        }
+        return null;
     }
 
     @Override
@@ -108,8 +118,16 @@ public final class EmployeeCollectionAdapter extends AbstractEntityCollectionAda
                               RequestContext request) throws ResponseContextException {
         Gson gson = new Gson();
         Employee employee = gson.fromJson(content.getText(), Employee.class);
-        employee.setUpdated(updated);
-        employees.put(employee.getId(), employee);
+        try {
+            if (dao.findById(employee.getId()) != null) {
+                LOG.warn("employee is existed:", content.getText());
+            } else {
+                employee.setUpdated(new java.sql.Date(updated.getTime()));
+                dao.addEmployees(employee);
+            }
+        } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+        }
         return employee;
     }
 
@@ -121,16 +139,25 @@ public final class EmployeeCollectionAdapter extends AbstractEntityCollectionAda
                          String summary,
                          Content content,
                          RequestContext request) throws ResponseContextException {
-        // TODO Auto-generated method stub
         employee.setName(title);
-        employee.setUpdated(updated);
-
+        employee.setUpdated(new java.sql.Date(updated.getTime()));
+        try {
+            dao.update(employee);
+        } catch (Exception e) {
+            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+            LOG.error(e.getMessage(), e);
+        }
     }
 
     @Override
     public void deleteEntry(String resourceName, RequestContext request) throws ResponseContextException {
         Integer id = getIdFromResourceName(resourceName);
-        employees.remove(id);
+        try {
+            Employee employee = dao.findById(id);
+            dao.delete(employee);
+        } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+        }
     }
 
     private Integer getIdFromResourceName(String resourceName) throws ResponseContextException {

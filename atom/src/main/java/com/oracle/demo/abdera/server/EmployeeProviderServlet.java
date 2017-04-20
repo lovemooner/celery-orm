@@ -25,9 +25,9 @@ public class EmployeeProviderServlet extends AbderaServlet {
 		DefaultProvider provider = new DefaultProvider("/");
 		provider.addWorkspace(wi);
 
-        AuthorityFilter authorityFilter = new AuthorityFilter();
-        FormatResponseFilter responseFilter=new FormatResponseFilter();
+//        AuthorityFilter authorityFilter = new AuthorityFilter();
 //        provider.addFilter(authorityFilter);
+        FormatResponseFilter responseFilter=new FormatResponseFilter();
         provider.addFilter(responseFilter);
         provider.init(getAbdera(), null);
 
